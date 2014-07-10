@@ -47,10 +47,8 @@
   ?>">
   <meta name="description" content="<?php bloginfo('description'); ?>">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="shortcut icon" href="<?php bloginfo('template_directory'); ?>/_/_images/favicon.ico">
-  <link rel="apple-touch-icon" href="<?php bloginfo('template_directory'); ?>/_/_images/apple-touch-icon.png">
   <link rel="stylesheet" href="<?php bloginfo('stylesheet_url'); ?>">
-  <link rel="pingback" href="<?php bloginfo('pingback_url'); ?>" />
+
   <?php include (TEMPLATEPATH . '/_/parts/global-site-styles.php' ); ?>
   <?php if ( is_singular() ) wp_enqueue_script( 'comment-reply' ); ?>
   <?php wp_head(); ?>

@@ -72,7 +72,10 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 0.4em; }
 
 h1, .h1 {
-  font-size: 2em; }
+  font-size: 2.5em; 
+  color: #9b3529;
+  margin-bottom: 1em;
+}
 
 h2, .h2 {
   font-size: 1.8em; }
@@ -159,7 +162,7 @@ html, body {
   padding: 10% 1.4em; }
 
 .center {
-  max-width: 34em;
+  max-width: 44em;
   margin: 0 auto; }
 
 .background {
@@ -370,3 +373,12 @@ textarea, input {
     position: absolute;
     top: -9999px;
     left: -9999px; }
+
+
+
+    /* custom stuff here */
+
+.home article {
+  text-align: center;
+}
+

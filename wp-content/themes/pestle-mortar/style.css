@@ -173,7 +173,7 @@ html, body {
   left: 50%;
   width: 191px;
   height: 140px;
-  margin-left: -4.1665em; }
+  margin-left: -5.167em; }
 
 .header-home {
   position: relative;
@@ -193,7 +193,7 @@ html, body {
     position: absolute;
     top: 35%;
     left: 50%;
-    margin-left: -4.1665em; }
+    margin-left: -4.167em; }
     @media (max-width: 40em) {
       .header-home .logo {
         top: 15%; } }
@@ -203,6 +203,10 @@ html, body {
   height: 40%; }
   .header .logo {
     top: 12%; }
+
+.home .header {
+  height: 60%; 
+}
 
 #nav ul {
   margin: 0;

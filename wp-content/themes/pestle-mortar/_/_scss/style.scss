@@ -1,0 +1,311 @@
+/*!
+Theme Name: Pestle & Mortar
+Theme URI: http://tinktank.in/themes/pestle-mortar/
+Description: A responsive WordPress Theme.
+Author: Tink Tank
+Author URI: http://tinktank.in
+Version: 1
+*/
+
+$sitecolor:            #F54448;
+$darkGray:             #5B636A;
+$lightGray:            #A9B2B9;
+$transBlack:           rgba(0,0,0,0.15);
+$transWhite:           rgba(255,255,255,0.15);
+
+@import 'bp';
+@import 'reset';
+@import 'toolbox';
+@import 'typography';
+
+
+//---------------------------------------- STRUCTURE
+html, body {
+  height: 100%;
+  min-height: 100%;
+  @include bp(S) {
+    font-size: 16px;
+  }
+}
+.page-wrap {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 10% 1.4em;
+}
+.center {
+  max-width: 34em;
+  margin: 0 auto;
+}
+
+//---------------------------------------- HEADER + NAV
+.background {
+  background-color: $transBlack;
+}
+.logo {
+  position: absolute;
+  left: 50%;
+  width: 8.333em;
+  height: auto;
+  margin-left:-4.1665em;
+}
+.header-home {
+  position: relative;
+  height: 100%;
+  @include bp (S) {
+    min-height: 15em;
+    height:70%;
+  }
+
+  &:before {
+    content: '';
+    position: absolute;
+    background: url('_/_images/arrow.svg') bottom center repeat-x;
+    bottom: 0px;
+    height: 70px;
+    width: 100%;
+  }
+  .logo {
+    position: absolute;
+    top:35%;
+    left: 50%;
+    margin-left:-4.1665em;
+    @include bp (S) {
+      top:15%;
+    }
+  }
+}
+.header {
+  min-height: 15em;
+  height:40%;
+
+  .logo {
+    top:12%;
+  }
+}
+
+#nav {
+
+  ul {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    display: block;
+    list-style: none;
+    text-align: right;
+    background: $sitecolor;
+  }
+
+  li {
+    width: 100%;
+    display: block;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+  }
+  a {
+    display: block;
+    padding: 0.5em 2%;
+    text-decoration: none;
+    color: white;
+    &:hover, &:focus {
+      background: rgba(0,0,0,0.05);
+    }
+  }
+}
+
+.js #nav {
+  clip: rect(0 0 0 0);
+  max-height: 0;
+  position: absolute;
+  display: block;
+  overflow: hidden;
+  zoom: 1;
+}
+
+#nav.opened {
+  max-height: 9999px;
+}
+#nav-toggle {
+  float: right;
+  margin: 2%;
+  padding: 1px;
+  font-size: 1.8em;
+  color: white;
+  text-decoration: none;
+  font-family: 'tinktankicons';
+  &:hover, &:focus {
+    color: $sitecolor;
+  }
+
+  span {
+    position: absolute;
+    top: -9999px;
+    left:-9999px;
+  }
+}
+
+//---------------------------------------- HOME PAGE
+.home-grid {
+  padding-bottom: 10%;
+}
+.home-tile {
+  position: relative;
+  float: left;
+  width: 33.33%;
+  border:1px solid white;
+  outline: none;
+  @include bp (S) {
+    width: 50%;
+  }
+  img {
+    width: 100%;
+    height: auto;
+  }
+  &:hover, &:focus {
+    border: 1px solid white;
+  }
+  &:hover span, &:focus span {
+    opacity: 1;
+  }
+  span {
+    position: absolute;
+    top:0;
+    right:0;
+    bottom:0;
+    left:0;
+    padding:1em;
+    background: $sitecolor;
+    opacity: 0;
+    @include transition;
+  }
+  h1 {
+    position: relative;
+    color: white;
+    font-size: 1.2em;
+    margin-bottom: 0;
+
+    &:after {
+      content: '';
+      position: absolute;
+      top:150%;
+      left:0;
+      width: 1em;
+      border-bottom: 3px solid $transWhite;
+    }
+  }
+}
+.pagination {
+
+  a {
+    text-decoration: none;
+    font-size: 2em;
+    color: $lightGray;
+    &:hover, &:focus {
+      color: $sitecolor;
+    }
+  }
+}
+
+//---------------------------------------- SINGLE
+.single-post, .single-page {
+  .title, .date {
+    text-align: center;
+  }
+}
+.single-entry {
+  padding: 0 0 10%;
+  margin: 0 0 10%;
+  border-bottom: 1px solid $transBlack;
+
+  .title {
+    text-align: center;
+  }
+  .date {
+    text-align: center;
+    color:$lightGray;
+  }
+}
+
+//---------------------------------------- COMMENTS
+#respond {
+  padding-top: 1.6em;
+}
+.commentlist {
+  padding: 0;
+
+  li {
+    padding: 1em 0;
+    list-style: none;
+    border-top: 1px solid $transBlack;
+    border-bottom: 1px solid $transBlack;
+  }
+  .avatar {
+    float: left;
+    width: 15%;
+    margin-right: 1em;
+  }
+  .comment-meta {
+    font-size: 80%;
+  }
+}
+textarea, input {
+  max-width:100%;
+  margin-bottom: 1em;
+  padding: 0.5em;
+  background: transparent;
+  border: 1px solid $transBlack;
+  font-size: 1em;
+}
+@include bp (S) {
+  .commentform {
+    label {
+      font-size: 1em;
+    }
+    input {
+      width: 50%;
+    }
+  }
+}
+
+//---------------------------------------- CONTACT FORM 7
+.wpcf7-form {
+  p {
+    margin: 0;
+  }
+}
+
+//---------------------------------------- FOOTER
+.footer {
+  border-top: 1px solid rgba(0,0,0,0.1);
+  text-align: center;
+  color: $lightGray;
+
+  .tinktank {
+    font-family:'Menlo';
+    font-size: 120%;
+  }
+
+  a {
+    color: $lightGray;
+
+    &:hover, &:focus {
+      color: $sitecolor;
+    }
+  }
+}
+
+//--------------------------------------- SOCIAL ICONS
+.social-icons {
+  width: 8em;
+  margin: 0 auto 0.5em;
+  font-size: 2.2em;
+  a {
+    display: inline-block;
+    padding: 1px;
+    margin-bottom: 0;
+    text-decoration: none;
+  }
+  span {
+    position: absolute;
+    top:-9999px;
+    left:-9999px;
+  }
+}

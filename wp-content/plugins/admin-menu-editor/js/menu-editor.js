@@ -3,6 +3,7 @@
 /*global wsEditorData, defaultMenu, customMenu */
 /** @namespace wsEditorData */
 
+wsEditorData.wsMenuEditorPro = !!wsEditorData.wsMenuEditorPro; //Cast to boolean.
 var wsIdCounter = 0;
 
 var AmeCapabilityManager = (function(roles, users) {
@@ -144,6 +145,8 @@ var AmeCapabilityManager = (function(roles, users) {
 			case 'user':
 				specificity = 10;
 				break;
+			default:
+				specificity = 0;
         }
 		return specificity;
     };
@@ -151,6 +154,9 @@ var AmeCapabilityManager = (function(roles, users) {
 
 	return me;
 })(wsEditorData.roles, wsEditorData.users);
+
+
+var AmeEditorApi = {};
 
 (function ($){
 
@@ -203,11 +209,7 @@ var itemTemplates = {
  */
 function setInputValue(input, value) {
 	if (input.attr('type') == 'checkbox'){
-        if (value){
-            input.attr('checked', 'checked');
-        } else {
-            input.removeAttr('checked');
-        }
+		input.prop('checked', value);
     } else {
         input.val(value);
     }
@@ -355,12 +357,17 @@ function buildMenuItem(itemData, isTopLevel) {
 	//the editors themselves are created later, when the user tries to access them
 	//for the first time).
 	var contents = [];
+	var menuTitle = ((itemData.menu_title != null) ? itemData.menu_title : itemData.defaults.menu_title);
+	if (menuTitle === '') {
+		menuTitle = '&nbsp;';
+	}
+
 	contents.push(
 		'<div class="ws_item_head">',
 			itemData.separator ? '' : '<a class="ws_edit_link"> </a><div class="ws_flag_container"> </div>',
 			'<input type="checkbox" class="ws_actor_access_checkbox">',
 			'<span class="ws_item_title">',
-				((itemData.menu_title != null) ? itemData.menu_title : itemData.defaults.menu_title),
+				stripAllTags(menuTitle),
 			'&nbsp;</span>',
 
 		'</div>',
@@ -411,6 +418,13 @@ function jsTrim(str){
 	return str.replace(/^\s+|\s+$/g, "");
 }
 
+function stripAllTags(input) {
+	//Based on: http://phpjs.org/functions/strip_tags/
+	var tags = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi,
+		commentsAndPhpTags = /<!--[\s\S]*?-->|<\?(?:php)?[\s\S]*?\?>/gi;
+	return input.replace(commentsAndPhpTags, '').replace(tags, '');
+}
+
 //Editor field spec template.
 var baseField = {
 	caption : '[No caption]',
@@ -434,12 +448,12 @@ var knownMenuFields = {
 		caption : 'Menu title',
 		display: function(menuItem, displayValue, input, containerNode) {
 			//Update the header as well.
-			containerNode.find('.ws_item_title').html(displayValue);
+			containerNode.find('.ws_item_title').html(stripAllTags(displayValue) + '&nbsp;');
 			return displayValue;
 		},
 		write: function(menuItem, value, input, containerNode) {
 			menuItem.menu_title = value;
-			containerNode.find('.ws_item_title').html(input.val() + '&nbsp;');
+			containerNode.find('.ws_item_title').html(stripAllTags(input.val()) + '&nbsp;');
 		}
 	}),
 
@@ -448,17 +462,49 @@ var knownMenuFields = {
 		type : 'select',
 		options : (function(){
 			//Generate name => id mappings for all item templates + the special "Custom" template.
-			var itemTemplateIds = {};
-			itemTemplateIds[wsEditorData.customItemTemplate.name] = '';
+			var itemTemplateIds = [];
+			itemTemplateIds.push([wsEditorData.customItemTemplate.name, '']);
+
 			for (var template_id in wsEditorData.itemTemplates) {
 				if (wsEditorData.itemTemplates.hasOwnProperty(template_id)) {
-					itemTemplateIds[wsEditorData.itemTemplates[template_id].name] = template_id;
+					itemTemplateIds.push([wsEditorData.itemTemplates[template_id].name, template_id]);
 				}
 			}
+
+			itemTemplateIds.sort(function(a, b) {
+				if (a[1] === b[1]) {
+					return 0;
+				}
+
+				//The "Custom" item is always first.
+				if (a[1] === '') {
+					return -1;
+				} else if (b[1] === '') {
+					return 1;
+				}
+
+				//Top-level items go before submenus.
+				var aIsTop = (a[1].charAt(0) === '>') ? 1 : 0;
+				var bIsTop = (b[1].charAt(0) === '>') ? 1 : 0;
+				if (aIsTop !== bIsTop) {
+					return bIsTop - aIsTop;
+				}
+
+				//Everything else is sorted by name, in alphabetical order.
+				if (a[0] > b[0]) {
+					return 1;
+				} else if (a[0] < b[0]) {
+					return -1;
+				}
+				return 0;
+			});
+
 			return itemTemplateIds;
 		})(),
 
 		write: function(menuItem, value, input, containerNode) {
+			var oldTemplateId = menuItem.template_id;
+
 			menuItem.template_id = value;
 			menuItem.defaults = itemTemplates.getDefaults(menuItem.template_id);
 		    menuItem.custom = (menuItem.template_id == '');
@@ -479,7 +525,10 @@ var knownMenuFields = {
 			    var hasDefaultValue = itemTemplates.hasDefaultValue(menuItem.template_id, fieldName);
 
 			    if (isSetToDefault && !hasDefaultValue) {
-				    menuItem[fieldName] = getInputValue(field.find('.ws_field_value'));
+					var oldDefaultValue = itemTemplates.getDefaultValue(oldTemplateId, fieldName);
+					if (oldDefaultValue !== null) {
+						menuItem[fieldName] = oldDefaultValue;
+					}
 			    }
 		    });
 		}
@@ -592,11 +641,11 @@ var knownMenuFields = {
 		caption: 'Open in',
 		advanced : true,
 		type : 'select',
-		options : {
-			'Same window or tab' : 'same_window',
-			'New window' : 'new_window',
-			'Frame' : 'iframe'
-		},
+		options : [
+			['Same window or tab', 'same_window'],
+			['New window', 'new_window'],
+			['Frame', 'iframe']
+		],
 		defaultValue: 'same_window',
 		visible: false
 	}),
@@ -614,20 +663,29 @@ var knownMenuFields = {
 		defaultValue: 'div',
 		onlyForTopMenus: true,
 
-		display: function(menuItem, displayValue, input) {
+		display: function(menuItem, displayValue, input, containerNode) {
 			//Display the current icon in the selector.
 			var cssClass = getFieldValue(menuItem, 'css_class', '');
 			var iconUrl = getFieldValue(menuItem, 'icon_url', '');
+
+			//When submenu icon visibility is set to "only if manually selected",
+			//don't show the default submenu icons.
+			var isDefault = (typeof menuItem['icon_url'] === 'undefined') || (menuItem['icon_url'] === null);
+			if (isDefault && (wsEditorData.submenuIconsEnabled === 'if_custom') && containerNode.hasClass('ws_item')) {
+				iconUrl = 'none';
+				cssClass = '';
+			}
 
 			var selectButton = input.closest('.ws_edit_field').find('.ws_select_icon');
 			var cssIcon = selectButton.find('.icon16');
 			var imageIcon = selectButton.find('img');
 
 			var matches = cssClass.match(/\b(ame-)?menu-icon-([^\s]+)\b/);
-			var dashiconMatches = iconUrl && iconUrl.match('^\s*(dashicons-[a-z0-9\-]+)');
+			var dashiconMatches = iconUrl && iconUrl.match(/^\s*(dashicons-[a-z0-9\-]+)/);
 
-			//Icon URL take precedence over icon class.
+			//Icon URL takes precedence over icon class.
 			if ( iconUrl && iconUrl !== 'none' && iconUrl !== 'div' && !dashiconMatches ) {
+				//Regular image icon.
 				cssIcon.hide();
 				imageIcon.prop('src', iconUrl).show();
 			} else if ( dashiconMatches ) {
@@ -747,11 +805,8 @@ function buildEditboxFields(fieldContainer, entry, isTopLevel){
 /*
  * Create an editor for a specified field.
  */
+//noinspection JSUnusedLocalSymbols
 function buildEditboxField(entry, field_name, field_settings){
-	if (typeof entry[field_name] === 'undefined') {
-		return null; //skip fields this entry doesn't have
-	}
-
 	//Build a form field of the appropriate type
 	var inputBox = null;
 	var basicTextField = '<input type="text" class="ws_field_value">';
@@ -760,12 +815,12 @@ function buildEditboxField(entry, field_name, field_settings){
 		case 'select':
 			inputBox = $('<select class="ws_field_value">');
 			var option = null;
-			for( var optionTitle in field_settings.options ){
-				if (!field_settings.options.hasOwnProperty(optionTitle)) {
-					continue;
-				}
+			for( var index = 0; index < field_settings.options.length; index++ ){
+				var optionTitle = field_settings.options[index][0];
+				var optionValue = field_settings.options[index][1];
+
 				option = $('<option>')
-					.val(field_settings.options[optionTitle])
+					.val(optionValue)
 					.text(optionTitle);
 				option.appendTo(inputBox);
 			}
@@ -840,6 +895,7 @@ function updateActorAccessUi(containerNode) {
 	if (selectedActor != null) {
 		var menuItem = containerNode.data('menu_item');
 		var hasAccess = actorCanAccessMenu(menuItem, selectedActor);
+		var hasCustomPermissions = actorHasCustomPermissions(menuItem, selectedActor);
 
 		var checkbox = containerNode.find('.ws_actor_access_checkbox');
 		checkbox.prop('checked', hasAccess);
@@ -870,8 +926,11 @@ function updateActorAccessUi(containerNode) {
 		}
 
 		containerNode.toggleClass('ws_is_hidden_for_actor', !hasAccess);
+		containerNode.toggleClass('ws_has_custom_permissions_for_actor', hasCustomPermissions);
+		setMenuFlag(containerNode, 'custom_actor_permissions', hasCustomPermissions)
 	} else {
-		containerNode.removeClass('ws_is_hidden_for_actor');
+		containerNode.removeClass('ws_is_hidden_for_actor ws_has_custom_permissions_for_actor');
+		setMenuFlag(containerNode, 'custom_actor_permissions', false);
 	}
 }
 
@@ -1001,21 +1060,44 @@ function encodeMenuAsJSON(tree){
 
 function readMenuTreeState(){
 	var tree = {};
-	var menu_position = 0;
+	var menuPosition = 0;
+	var itemsByFilename = {};
 
 	//Gather all menus and their items
 	$('#ws_menu_box').find('.ws_menu').each(function() {
-		var menu = readItemState(this, menu_position++);
+		var containerNode = this;
+		var menu = readItemState(containerNode, menuPosition++);
 
-		//Attach the current menu to the main struct
-		var filename = (menu.file !== null)?menu.file:menu.defaults.file;
+		//Attach the current menu to the main structure.
+		var filename = (menu.file !== null) ? menu.file : menu.defaults.file;
+
+		//Give unclickable items unique keys.
+		if (menu.template_id === wsEditorData.unclickableTemplateId) {
+			ws_paste_count++;
+			filename = '#' + wsEditorData.unclickableTemplateClass + '-' + ws_paste_count;
+		}
+
+		//Prevent the user from saving top level items with duplicate URLs.
+		//WordPress indexes the submenu array by parent URL and AME uses a {url : menu_data} hashtable internally.
+		//Duplicate URLs would cause problems for both.
+		if (itemsByFilename.hasOwnProperty(filename)) {
+			throw {
+				code: 'duplicate_top_level_url',
+				message: 'Error: Found a duplicate URL! All top level menus must have unique URLs.',
+				duplicates: [itemsByFilename[filename], containerNode]
+			}
+		}
+
 		tree[filename] = menu;
+		itemsByFilename[filename] = containerNode;
 	});
 
 	return {
 		tree: tree
 	};
 }
+
+AmeEditorApi.readMenuTreeState = readMenuTreeState;
 
 /**
  * Extract the current menu item settings from its editor widget.
@@ -1108,8 +1190,9 @@ function readAllFields(container){
 
 var item_flags = {
 	'custom':'This is a custom menu item',
-	'unused':'This item was automatically (re)inserted into your custom menu because it is present in the default WordPress menu',
-	'hidden':'This item is hidden'
+	'unused':'This item was automatically recreated. You cannot delete a non-custom item, but you could hide it.',
+	'hidden':'This item is hidden from ALL roles and users',
+	'custom_actor_permissions' : "The selected role has custom permissions for this item."
 };
 
 function setMenuFlag(item, flag, state) {
@@ -1156,6 +1239,15 @@ function actorCanAccessMenu(menuItem, actor) {
 	return actorHasAccess;
 }
 
+AmeEditorApi.actorCanAccessMenu = actorCanAccessMenu;
+
+function actorHasCustomPermissions(menuItem, actor) {
+	if (menuItem.grant_access && menuItem.grant_access.hasOwnProperty && menuItem.grant_access.hasOwnProperty(actor)) {
+		return (menuItem.grant_access[actor] !== null);
+	}
+	return false;
+}
+
 function setActorAccess(containerNode, actor, allowAccess) {
 	var menuItem = containerNode.data('menu_item');
 
@@ -1195,13 +1287,9 @@ function setSelectedActor(actor) {
 	editorNode.toggleClass('ws_is_actor_view', (selectedActor != null));
 
 	//Update the menu item states to indicate whether they're accessible.
-	if (selectedActor != null) {
-		editorNode.find('.ws_container').each(function() {
-			updateActorAccessUi($(this));
-		});
-	} else {
-		editorNode.find('.ws_is_hidden_for_actor').removeClass('ws_is_hidden_for_actor');
-	}
+	editorNode.find('.ws_container').each(function() {
+		updateActorAccessUi($(this));
+	});
 }
 
 /**
@@ -1224,11 +1312,14 @@ function denyAccessForAllExcept(menuItem, actor) {
 
 	$.each(wsEditorData.actors, function(otherActor) {
 		//If the input actor is more or equally specific...
-		if (AmeCapabilityManager.compareActorSpecificity(actor, otherActor) >= 0) {
+		if ((actor === null) || (AmeCapabilityManager.compareActorSpecificity(actor, otherActor) >= 0)) {
 			menuItem.grant_access[otherActor] = false;
 		}
 	});
-	menuItem.grant_access[actor] = true;
+
+	if (actor !== null) {
+		menuItem.grant_access[actor] = true;
+	}
 	return menuItem;
 }
 
@@ -1248,8 +1339,15 @@ $(document).ready(function(){
 		knownMenuFields['page_heading'].visible = true;
 		knownMenuFields['colors'].visible = true;
 		knownMenuFields['extra_capability'].visible = false; //Superseded by the "access_level" field.
+
+		//The Pro version supports submenu icons, but they can be disabled by the user.
+		knownMenuFields['icon_url'].onlyForTopMenus = (wsEditorData.submenuIconsEnabled == 'never');
+
 		$('.ws_hide_if_pro').hide();
 	}
+
+	//Let other plugins filter knownMenuFields.
+	$(document).trigger('filterMenuFields.adminMenuEditor', [knownMenuFields, baseField]);
 
 	//Make the top menu box sortable (we only need to do this once)
     var mainMenuBox = $('#ws_menu_box');
@@ -1544,7 +1642,7 @@ $(document).ready(function(){
 
 			var actorHasAccess = actorCanAccessMenu(menuItem, actor);
 			if (actorHasAccess) {
-				checkbox.attr('checked', 'checked');
+				checkbox.prop('checked', true);
 			}
 
 			alternate = (alternate == '') ? 'alternate' : '';
@@ -1862,7 +1960,7 @@ $(document).ready(function(){
         //Create a custom media frame.
         frame = wp.media.frames.customAdminMenuIcon = wp.media({
             //Set the title of the modal.
-            title: 'Choose a Custom Icon (16x16)',
+            title: 'Choose a Custom Icon (20x20)',
 
             //Tell it to show only images.
             library: {
@@ -2086,18 +2184,149 @@ $(document).ready(function(){
 		});
 	});
 
+	//Delete error dialog. It shows up when the user tries to delete one of the default menus.
+	var menuDeletionDialog = $('#ws-ame-menu-deletion-error').dialog({
+		autoOpen: false,
+		modal: true,
+		closeText: ' ',
+		title: 'Error',
+		draggable: false
+	});
+	var menuDeletionCallback = function(hide) {
+		menuDeletionDialog.dialog('close');
+		var selection = menuDeletionDialog.data('selected_menu');
+
+		function applyCallbackRecursively(containerNode, callback) {
+			callback(containerNode.data('menu_item'));
+
+			var subMenuId = containerNode.data('submenu_id');
+			if (subMenuId && containerNode.hasClass('ws_menu')) {
+				$('.ws_item', '#' + subMenuId).each(function() {
+					var node = $(this);
+					callback(node.data('menu_item'));
+					updateItemEditor(node);
+				});
+			}
+
+			updateItemEditor(containerNode);
+		}
+
+		function hideRecursively(containerNode, exceptActor) {
+			applyCallbackRecursively(containerNode, function(menuItem) {
+				denyAccessForAllExcept(menuItem, exceptActor);
+			});
+			updateParentAccessUi(containerNode);
+		}
+
+		if (hide === 'all') {
+			if (wsEditorData.wsMenuEditorPro) {
+				hideRecursively(selection, null);
+			} else {
+				//The free version doesn't have role permissions, so use the global "hidden" flag.
+				applyCallbackRecursively(selection, function(menuItem) {
+					menuItem.hidden = true;
+				});
+			}
+		} else if (hide === 'except_current_user') {
+			hideRecursively(selection, 'user:' + wsEditorData.currentUserLogin);
+		} else if (hide === 'except_administrator' && !wsEditorData.wsMenuEditorPro) {
+			//Set "required capability" to something only the Administrator role would have.
+			var adminOnlyCap = 'manage_options';
+			applyCallbackRecursively(selection, function(menuItem) {
+				menuItem.extra_capability = adminOnlyCap;
+			});
+			alert('The "required capability" field was set to "' + adminOnlyCap + '".')
+		}
+	};
+
+	//Callbacks for each of the dialog buttons.
+	$('#ws_cancel_menu_deletion').click(function() {
+		menuDeletionCallback(false);
+	});
+	$('#ws_hide_menu_from_everyone').click(function() {
+		menuDeletionCallback('all');
+	});
+	$('#ws_hide_menu_except_current_user').click(function() {
+		menuDeletionCallback('except_current_user');
+	});
+	$('#ws_hide_menu_except_administrator').click(function() {
+		menuDeletionCallback('except_administrator');
+	});
+
+	/**
+	 * Attempt to delete a menu item. Will check if the item can actually be deleted and ask the user for confirmation.
+	 * UI callback.
+	 *
+	 * @param selection The selected menu item (DOM node).
+	 */
+	function tryDeleteItem(selection) {
+		var menuItem = selection.data('menu_item');
+		var isDefaultItem =
+			( menuItem.template_id !== '')
+				&& ( menuItem.template_id !== wsEditorData.unclickableTemplateId)
+				&& (!menuItem.separator);
+
+		var otherCopiesExist = false;
+		var shouldDelete = false;
+
+		if (isDefaultItem) {
+			//Check if there are any other menus with the same template ID.
+			$('#ws_menu_editor').find('.ws_container').each(function() {
+				var otherItem = $(this).data('menu_item');
+				if ((menuItem != otherItem) && (menuItem.template_id == otherItem.template_id)) {
+					otherCopiesExist = true;
+					return false;
+				}
+				return true;
+			});
+		}
+
+		if (!isDefaultItem || otherCopiesExist) {
+			//Custom and duplicate items can be deleted normally.
+			shouldDelete = confirm('Delete this menu?');
+		} else {
+			//Non-custom items can not be deleted, but they can be hidden. Ask the user if they want to do that.
+			menuDeletionDialog.find('#ws-ame-menu-type-desc').text(
+				menuItem.defaults.is_plugin_page ? 'an item added by another plugin' : 'a built-in menu item'
+			);
+			menuDeletionDialog.data('selected_menu', selection);
+
+			//Different versions get slightly different options because only the Pro version has
+			//role-specific permissions.
+			$('#ws_hide_menu_except_current_user').toggleClass('hidden', !wsEditorData.wsMenuEditorPro);
+			$('#ws_hide_menu_except_administrator').toggleClass('hidden', wsEditorData.wsMenuEditorPro);
+
+			menuDeletionDialog.dialog('open');
+
+			//Select "Cancel" as the default button.
+			menuDeletionDialog.find('#ws_cancel_menu_deletion').focus();
+		}
+
+		if (shouldDelete) {
+			//Delete this menu's submenu first, if any.
+			var submenuId = selection.data('submenu_id');
+			if (submenuId) {
+				$('#' + submenuId).remove();
+			}
+			var parentSubmenu = selection.closest('.ws_submenu');
+
+			//Delete the menu.
+			selection.remove();
+
+			if (parentSubmenu) {
+				//Refresh permissions UI for this menu's parent (if any).
+				updateParentAccessUi(parentSubmenu);
+			}
+		}
+	}
+
 	//Delete menu
 	$('#ws_delete_menu').click(function () {
 		//Get the selected menu
 		var selection = getSelectedMenu();
 		if (!selection.length) return;
 
-		if (confirm('Delete this menu?')){
-			//Delete the submenu first
-			$('#' + selection.data('submenu_id')).remove();
-			//Delete the menu
-			selection.remove();
-		}
+		tryDeleteItem(selection);
 	});
 
 	//Copy menu
@@ -2137,7 +2366,7 @@ $(document).ready(function(){
 			menu.css_class = 'menu-top';
 		}
 		if (getFieldValue(menu, 'icon_url', '') == '') {
-			menu.icon_url = 'images/generic.png';
+			menu.icon_url = 'dashicons-admin-generic';
 		}
 		if (getFieldValue(menu, 'hookname', '') == '') {
 			menu.hookname = randomMenuId();
@@ -2175,7 +2404,7 @@ $(document).ready(function(){
 			menu_title : 'Custom Menu ' + ws_paste_count,
 			file : randomId,
 			items: [],
-			defaults: itemTemplates.getDefaults('')
+			defaults: $.extend({}, itemTemplates.getDefaults(''))
 		});
 
 		//Make it accessible only to the current actor if one is selected.
@@ -2237,6 +2466,82 @@ $(document).ready(function(){
 		});
 	});
 
+	//Copy all menu permissions from one role to another.
+	var copyPermissionsDialog = $('#ws-ame-copy-permissions-dialog').dialog({
+		autoOpen: false,
+		modal: true,
+		closeText: ' ',
+		draggable: false
+	});
+
+	//Populate source/destination lists.
+	var sourceActorList = $('#ame-copy-source-actor'), destinationActorList = $('#ame-copy-destination-actor');
+	$.each(wsEditorData.actors, function(actor, name) {
+		var option = $('<option>', {val: actor, text: name});
+		sourceActorList.append(option);
+		destinationActorList.append(option.clone());
+	});
+
+	//The "Copy permissions" toolbar button.
+	$('#ws_copy_role_permissions').click(function() {
+		//Pre-select the current actor as the destination.
+		if (selectedActor !== null) {
+			destinationActorList.val(selectedActor);
+		}
+		copyPermissionsDialog.dialog('open');
+	});
+
+	//Actually copy the permissions when the user click the confirmation button.
+	var copyConfirmationButton = $('#ws-ame-confirm-copy-permissions');
+	copyConfirmationButton.click(function() {
+		var sourceActor = sourceActorList.val();
+		var destinationActor = destinationActorList.val();
+
+		if (sourceActor === null || destinationActor === null) {
+			alert('Select a source and a destination first.');
+			return;
+		}
+
+		//Iterate over all menu items and copy the permissions from one actor to the other.
+		var allMenuNodes = $('.ws_menu', '#ws_menu_box').add('.ws_item', '#ws_submenu_box');
+		allMenuNodes.each(function() {
+			var node = $(this);
+			var menuItem = node.data('menu_item');
+
+			//Only change permissions when they don't match. This ensures we won't unnecessarily overwrite default
+			//permissions and bloat the configuration with extra grant_access entries.
+			var sourceAccess      = actorCanAccessMenu(menuItem, sourceActor);
+			var destinationAccess = actorCanAccessMenu(menuItem, destinationActor);
+			if (sourceAccess !== destinationAccess) {
+				setActorAccess(node, destinationActor, sourceAccess);
+				//Note: In theory, we could also look at the default permissions for destinationActor and
+				//revert to default instead of overwriting if that would make the two actors' permissions match.
+			}
+		});
+
+		//If the user is currently looking at the destination actor, force the UI to refresh
+		//so that they can see the new permissions.
+		if (selectedActor === destinationActor) {
+			//This is a bit of a hack, but right now there's no better way to refresh all items at once.
+			setSelectedActor(null);
+			setSelectedActor(destinationActor);
+		}
+
+		//All done.
+		copyPermissionsDialog.dialog('close');
+	});
+
+	//Only enable the copy button when the user selects a valid source and destination.
+	copyConfirmationButton.prop('disabled', true);
+	sourceActorList.add(destinationActorList).click(function() {
+		var sourceActor = sourceActorList.val();
+		var destinationActor = destinationActorList.val();
+
+		var validInputs = (sourceActor !== null) && (destinationActor !== null) && (sourceActor !== destinationActor);
+		copyConfirmationButton.prop('disabled', !validInputs);
+	});
+
+
 	/*************************************************************************
 	                          Item toolbar buttons
 	 *************************************************************************/
@@ -2258,16 +2563,10 @@ $(document).ready(function(){
 
 	//Delete item
 	$('#ws_delete_item').click(function () {
-		//Get the selected menu
 		var selection = getSelectedSubmenuItem();
 		if (!selection.length) return;
 
-		if (confirm('Delete this menu item?')){
-			var submenu = selection.parent();
-			//Delete the item
-			selection.remove();
-			updateParentAccessUi(submenu);
-		}
+		tryDeleteItem(selection);
 	});
 
 	//Copy item
@@ -2356,7 +2655,7 @@ $(document).ready(function(){
 			menu_title : 'Custom Item ' + ws_paste_count,
 			file : randomMenuId(),
 			items: [],
-			defaults: itemTemplates.getDefaults('')
+			defaults: $.extend({}, itemTemplates.getDefaults(''))
 		});
 
 		//Make it accessible to only the currently selected actor.
@@ -2420,7 +2719,23 @@ $(document).ready(function(){
 
 	//Save Changes - encode the current menu as JSON and save
 	$('#ws_save_menu').click(function () {
-		var tree = readMenuTreeState();
+		try {
+			var tree = readMenuTreeState();
+		} catch (error) {
+			//Right now the only known error condition is duplicate top level URLs.
+			if (error.hasOwnProperty('code') && (error.code === 'duplicate_top_level_url')) {
+				var message = 'Error: Duplicate menu URLs. The following top level menus have the same URL:\n\n' ;
+				for (var i = 0; i < error.duplicates.length; i++) {
+					var containerNode = $(error.duplicates[i]);
+					message += (i + 1) + '. ' + containerNode.find('.ws_item_title').first().text() + '\n';
+				}
+				message += '\nPlease change the URLs to be unique or delete the duplicates.';
+				alert(message);
+			} else {
+				alert(error.message);
+			}
+			return;
+		}
 
 		function findItemByTemplateId(items, templateId) {
 			var foundItem = null;
@@ -2457,8 +2772,6 @@ $(document).ready(function(){
             }
         }
 
-		console.log(tree);
-		//return;
 		var data = encodeMenuAsJSON(tree);
 		$('#ws_data').val(data);
 		$('#ws_data_length').val(data.length);
@@ -2490,16 +2803,27 @@ $(document).ready(function(){
 
 	$('#ws_export_menu').click(function(){
 		var button = $(this);
-		button.attr('disabled', 'disabled');
+		button.prop('disabled', true);
 		button.val('Exporting...');
 
 		$('#export_complete_notice, #download_menu_button').hide();
 		$('#export_progress_notice').show();
-		$('#export_dialog').dialog('open');
+		var exportDialog = $('#export_dialog');
+		exportDialog.dialog('open');
 
-		//Encode and store the menu for download
-		var exportData = encodeMenuAsJSON();
+		//Encode the menu.
+		try {
+			var exportData = encodeMenuAsJSON();
+		} catch (error) {
+			exportDialog.dialog('close');
+			alert(error.message);
 
+			button.val('Export');
+			button.prop('disabled', false);
+			return;
+		}
+
+		//Store the menu for download.
 		$.post(
 			wsEditorData.adminAjaxUrl,
 			{
@@ -2509,16 +2833,16 @@ $(document).ready(function(){
 			},
 			function(data){
 				button.val('Export');
-				button.removeAttr('disabled');
+				button.prop('disabled', false);
 
 				if ( typeof data['error'] != 'undefined' ){
-					$('#export_dialog').dialog('close');
+					exportDialog.dialog('close');
 					alert(data.error);
 				}
 
 				if ( (typeof data['download_url'] != 'undefined') && data.download_url ){
 					//window.location = data.download_url;
-					$('#download_menu_button').attr('href', data.download_url);
+					$('#download_menu_button').attr('href', data.download_url).data('filesize', data.filesize);
 					$('#export_progress_notice').hide();
 					$('#export_complete_notice, #download_menu_button').show();
 				}
@@ -2547,7 +2871,8 @@ $(document).ready(function(){
 	});
 
 	$('#ws_import_menu').click(function(){
-		$('#import_progress_notice, #import_progress_notice2, #import_complete_notice').hide();
+		$('#import_progress_notice, #import_progress_notice2, #import_complete_notice, #ws_import_error').hide();
+		$('#ws_import_panel').show();
 		$('#import_menu_form').resetForm();
 		//The "Upload" button is disabled until the user selects a file
 		$('#ws_start_import').attr('disabled', 'disabled');
@@ -2560,6 +2885,21 @@ $(document).ready(function(){
 	$('#import_file_selector').change(function(){
 		$('#ws_start_import').prop('disabled', ! $(this).val() );
 	});
+
+	//This function displays unhandled server side errors. In theory, our upload handler always returns a well-formed
+	//response even if there's an error. In practice, stuff can go wrong in unexpected ways (e.g. plugin conflicts).
+	function handleUnexpectedImportError(xhr, errorMessage) {
+		//The server-side code didn't catch this error, so it's probably something serious
+		//and retrying won't work.
+		$('#import_menu_form').resetForm();
+		$('#ws_import_panel').hide();
+
+		//Display error information.
+		$('#ws_import_error_message').text(errorMessage);
+		$('#ws_import_error_http_code').text(xhr.status);
+		$('#ws_import_error_response').text((xhr.responseText !== '') ? xhr.responseText : '[Empty response]');
+		$('#ws_import_error').show();
+	}
 
 	//AJAXify the upload form
 	$('#import_menu_form').ajaxForm({
@@ -2582,11 +2922,18 @@ $(document).ready(function(){
 			$('#ws_start_import').attr('disabled', 'disabled');
 			return true;
 		},
-		success: function(data){
+		success: function(data, status, xhr) {
+			$('#import_progress_notice').hide();
+
 			var importDialog = $('#import_dialog');
 			if ( !importDialog.dialog('isOpen') ){
 				//Whoops, the user closed the dialog while the upload was in progress.
 				//Discard the response silently.
+				return;
+			}
+
+			if ( data === null ) {
+				handleUnexpectedImportError(xhr, 'Invalid response from server. Please check your PHP error log.');
 				return;
 			}
 
@@ -2596,7 +2943,6 @@ $(document).ready(function(){
 				$('#import_menu_form').resetForm();
 				importDialog.find('.hide-when-uploading').show();
 			}
-			$('#import_progress_notice').hide();
 
 			if ( (typeof data['tree'] != 'undefined') && data.tree ){
 				//Whee, we got back a (seemingly) valid menu. A veritable miracle!
@@ -2612,6 +2958,9 @@ $(document).ready(function(){
 				}), 500);
 			}
 
+		},
+		error: function(xhr, status, errorMessage) {
+			handleUnexpectedImportError(xhr, errorMessage);
 		}
 	});
 

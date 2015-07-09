@@ -8,7 +8,7 @@ class CPAC_Column_User_Post_Count extends CPAC_Column {
 
 	/**
 	 * @see CPAC_Column::init()
-	 * @since 2.3
+	 * @since 2.2.1
 	 */
 	public function init() {
 
@@ -30,20 +30,7 @@ class CPAC_Column_User_Post_Count extends CPAC_Column {
 	 */
 	public function get_count( $user_id ) {
 
-		if( ! $user_id )
-			return false;
-
-		global $wpdb;
-
-		$sql = "
-			SELECT COUNT(ID)
-			FROM {$wpdb->posts}
-			WHERE post_status = 'publish'
-			AND post_author = %d
-			AND post_type = %s
-		";
-
-		return $wpdb->get_var( $wpdb->prepare( $sql, $user_id, $this->options->post_type ) );
+		return $this->get_user_postcount( $user_id, $this->options->post_type );
 	}
 
 	/**

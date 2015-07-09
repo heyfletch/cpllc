@@ -2,13 +2,13 @@
 /*
 Plugin Name: White Label CMS
 Plugin URI: http://www.videousermanuals.com/white-label-cms/?utm_campaign=wlcms&utm_medium=plugin&utm_source=readme-txt
-Description:  A plugin that allows you to brand wordpress CMS as your own
-Version: 1.5.2
+Description:  A plugin that allows you to brand WordPress CMS as your own
+Version: 1.5.4
 Author: www.videousermanuals.com
 Author URI: http://www.videousermanuals.com/?utm_campaign=wlcms&utm_medium=plugin&utm_source=readme-txt
 */
 
-define('WLCMS','1.5.2');
+define('WLCMS','1.5.4');
 
 if ( ! defined('ABSPATH') ) {
         die('Please do not load this file directly.');
@@ -23,9 +23,9 @@ if ( ! defined('WP_BACKUP_DIR') ) {
         define('WP_BACKUP_DIR', $wpdbb_content_dir . '/');
 }
 
-if(!function_exists('wp_get_current_user')) {
-    include(ABSPATH . "wp-includes/pluggable.php"); 
-}
+//if(!function_exists('wp_get_current_user')) {
+//    include(ABSPATH . "wp-includes/pluggable.php");
+//}
  
 include('includes/conditionals.php');
 
@@ -151,7 +151,14 @@ unset($wp_meta_boxes['dashboard']['normal']['core']['custom_help_widget']);
 unset($wp_meta_boxes['dashboard']['normal']['core']['my_dashboard_widget']);
  
 }
- 
+
+function wlcms_remove_activity_panel()
+{
+	if( get_option('wlcms_o_dashboard_admin') && current_user_can('activate_plugins') ) { return; }
+	global $wp_meta_boxes;
+	unset($wp_meta_boxes['dashboard']['normal']['core']['dashboard_activity']);
+}
+
 function wlcms_remove_right_now()
 {
     if( get_option('wlcms_o_dashboard_admin') && current_user_can('activate_plugins') ) { return; }
@@ -674,7 +681,12 @@ function wlcms_add_admin()
         }
         elseif( isset($_REQUEST['action']) && 'import' == $_REQUEST['action'] )
         {
-            add_action('admin_init', 'wlcmsImport');
+			// Only run the import function if we pass a nonce
+			if( check_admin_referer( 'wlcms_import' ) ) {
+            	add_action('admin_init', 'wlcmsImport');
+			} else {
+				wp_die( 'Failed the WLCMS Import Nonce' );
+			}
         }
     }
 }
@@ -698,10 +710,18 @@ function wlcmsImport()
 
         $site_url = get_bloginfo('url');
 
-        foreach($import as $name=>$value):
-            $val = str_replace( '{SITEURL}', $site_url, $value );
-            add_option($name, $val); // Add in new option
-        endforeach;
+		foreach ( $import as $name => $value ) {
+
+			// If the value includes this shortcode, replace it.
+			$val = str_replace( '{SITEURL}', $site_url, $value );
+
+			// Check that our option key starts with WLCMS
+			if ( strpos( $name, 'wlcms_o' ) === 0 ) {
+				add_option( $name, $val );
+			} else {
+				wp_die( __('<strong>Error!</strong> During the import process we almost imported a non White Label CMS setting - please ensure you uploaded the correct file and try again.' ) );
+			}
+		}
 
         header("Location: admin.php?page=wlcms-plugin.php&import=true");
         exit;

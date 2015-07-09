@@ -1,6 +1,7 @@
 <?php
 /**
- * CPAC_Column_Post_Taxonomy
+ * Taxonomy column, displaying terms from a taxonomy for any object type (i.e. posts)
+ * supporting WordPress' native way of handling terms.
  *
  * @since 2.0
  */
@@ -8,12 +9,12 @@ class CPAC_Column_Taxonomy extends CPAC_Column {
 
 	/**
 	 * @see CPAC_Column::init()
-	 * @since 2.3
+	 * @since 2.2.1
 	 */
 	public function init() {
 
 		parent::init();
-		
+
 		// Properties
 		$this->properties['type']			= 'column-taxonomy';
 		$this->properties['label']			= __( 'Taxonomy', 'cpac' );
@@ -27,62 +28,38 @@ class CPAC_Column_Taxonomy extends CPAC_Column {
 	 * @see CPAC_Column::get_value()
 	 * @since 2.0
 	 */
-	function get_value( $post_id ) {
-
-		$values = array();
-
+	public function get_value( $post_id ) {
 		$term_ids = $this->get_raw_value( $post_id );
-
-		$post_type = $this->get_post_type();
-
-		if ( $term_ids && ! is_wp_error( $term_ids ) ) {
-			foreach ( $term_ids as $term_id ) {
-				$term = get_term( $term_id, $this->options->taxonomy );
-				$title = esc_html( sanitize_term_field( 'name', $term->name, $term->term_id, $term->taxonomy, 'edit' ) );
-
-				$link = "<a href='edit.php?post_type={$post_type}&{$term->taxonomy}={$term->slug}'>{$title}</a>";
-				if ( $post_type == 'attachment' )
-					$link = "<a href='upload.php?taxonomy={$term->taxonomy}&term={$term->slug}'>{$title}</a>";
-
-				$values[] = $link;
-			}
-		}
-
-		return implode( ', ', $values );
+		return $this->get_terms_for_display( $term_ids, $this->options->taxonomy );
 	}
 
 	/**
 	 * @see CPAC_Column::get_raw_value()
 	 * @since 2.0.3
 	 */
-	function get_raw_value( $post_id ) {
-
+	public function get_raw_value( $post_id ) {
 		return wp_get_post_terms( $post_id, $this->options->taxonomy, array( 'fields' => 'ids' ) );
 	}
 
 	/**
-	 * Get post type
-	 *
-	 * @since 2.1.1
+	 * @see CPAC_Column::get_value()
+	 * @since 2.3.4
 	 */
-	function get_post_type() {
-
-		return isset( $this->storage_model->post_type ) ? $this->storage_model->post_type : false;
+	public function get_taxonomy() {
+		return $this->options->taxonomy;
 	}
 
 	/**
 	 * @see CPAC_Column::apply_conditional()
 	 * @since 2.0
 	 */
-	function apply_conditional() {
-
+	public function apply_conditional() {
 		$post_type = $this->get_post_type();
-
-		if ( $post_type && get_object_taxonomies( $post_type ) ) {
-			return true;
+		if ( ! $post_type || ! get_object_taxonomies( $post_type ) ) {
+			return false;
 		}
 
-		return false;
+		return true;
 	}
 
 	/**
@@ -91,7 +68,7 @@ class CPAC_Column_Taxonomy extends CPAC_Column {
 	 * @see CPAC_Column::display_settings()
 	 * @since 2.0
 	 */
-	function display_settings() {
+	public function display_settings() {
 
 		$taxonomies = get_object_taxonomies( $this->get_post_type(), 'objects' );
 
